@@ -1,0 +1,40 @@
+name: Build DocuFind for Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: docufind/pom.xml
+
+      - name: Locate WiX Toolset
+        shell: pwsh
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            $candle = Get-Item "${env:ProgramFiles(x86)}\WiX Toolset v3.*\bin\candle.exe" -ErrorAction Stop |
+              Select-Object -First 1
+            $candle.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+      - name: Run tests and build the Windows installer
+        shell: cmd
+        working-directory: docufind
+        run: call build-windows.cmd
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: DocuFind-Windows-Installer
+          path: docufind/target/windows/installer/DocuFind-*.exe
+          if-no-files-found: error
